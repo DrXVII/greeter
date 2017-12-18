@@ -9,6 +9,8 @@
 #include <ncurses.h>
 
 #define MAX_CMD_LEN 1024
+#define MAX_CFG_LN_LEN 1024
+#define VERSION "v1.0.2"
 
 int init_nc(void); //initialise ncurses
 int view_file(const char *_fpath); //function for viewing files
@@ -17,6 +19,7 @@ int slow_print_file(const char *_fpath); //prints file slowly char by char
 int print_mid(int _y, const char* _s); //print in middle of screen (on x axis)
 int zeroize_str(char *_str, unsigned _len); //fill a char array with null bytes
 int get_strings(int *strc_, char **strv_, const char *_fname); //gets strings from config file
+int read_cfg_file(int *strc_, char **strv_, const char *_fname);
 int main_menu(void);
 
 int main(void)
@@ -99,6 +102,7 @@ int slow_print_file(const char *_fpath)
         clear();
 
         halfdelay(1); //getch() will wait a bit and then continue
+        //quickly printing some characters that usually appear in bulk
         while((ch = getc(file)) != EOF) {
             addch(ch);
             if(ch == '*'
@@ -114,18 +118,19 @@ int slow_print_file(const char *_fpath)
             cmd = getch();
             if(cmd != ERR) { break; }
         }
-        cbreak(); //getch() will wait for input indefinitely
+        cbreak(); //getch() will wait for input indefinitely (interruptable)
     }
     else {
+        clear();
         mvprintw(0, 0, "ERROR(%d - %s): could not read %s\n",
                 err, strerror(errno), _fpath);
+        getch();
+        clear();
+        return -1;
     }
+    
 
-    int max_y;
-    int max_x; //only needed fort the getmaxyx
-    getmaxyx(stdscr, max_y, max_x);
-
-    mvprintw(max_y - 1, 0, "press any key to continue");
+    mvprintw(getmaxy(stdscr) - 1, 0, "press any key to continue");
     getch(); //press any key to continue
     clear();
 
@@ -148,14 +153,15 @@ int main_menu(void)
     int cmd = 0;
 
     const char cfg_fname[] = "config.cfg";
-    int strc;
-    char **strv;
 
-    //get_strings(&strc, strv, cfg_fname);
-
-    //TODO read from config instead of hardcoding, if no config found, read defaults.cfg
-    char daily_fpath[] = "/home/egidijus/Dropbox/suitcase/become_better/get_better.txt";
-    char todo_fpath[] = "$HOME/Dropbox/suitcase/todo";
+    char def_daily_fpath[] = "/home/egidijus/Dropbox/suitcase/become_better/get_better.txt";
+    char def_todo_fpath[] = "/home/egidijus/Dropbox/suitcase/todo";
+    char daily_fpath[256];
+    char todo_fpath[256];
+    //assigning defaults
+    strcpy(daily_fpath, def_daily_fpath);
+    strcpy(todo_fpath, def_todo_fpath);
+    //TODO menu entry text and the way to open the file shoudl be configured in the cfg as well
 
     enum Opts {daily = 0, todo, quit};
     int default_sel = daily;
@@ -172,14 +178,26 @@ int main_menu(void)
     entries[todo] = "edit todo list";
     entries[quit] = "quit to terminal";
 
+    //TODO testing only - remove when done
+    int strc = 0;
+    int *p_strc = &strc;
+    unsigned max_strc = 20;
+    char *strv[max_strc];
+    read_cfg_file(p_strc, strv, cfg_fname);
+
+    //if no config found, read defaults.cfg
+    if(strc > 0) {
+        strcpy(daily_fpath, strv[0]);
+    }
+    if(strc > 1) {
+        strcpy(todo_fpath, strv[1]);
+    }
+
     char date_str[64];
     const int menu_min_y = 0;
     const int opts_start_pos = 2;
     int sel = default_sel;
     while(cmd != 'q') {
-        //TODO no need to clear the entire screen
-        //BUG flicker on some (very fast?) terminals - should be resolved by above todo
-
         time_t t = time(NULL);
         struct tm *tm_st = localtime(&t);
 
@@ -188,6 +206,7 @@ int main_menu(void)
         print_mid(menu_min_y, date_str);
         int menu_min_x = print_mid(menu_min_y + 1, menu_header);
 
+        //print menu options
         for(unsigned i = 0; i < opt_count; ++i) {
             if(i == sel) { //paint selected menu option differently
                 attron(COLOR_PAIR(1));
@@ -195,16 +214,21 @@ int main_menu(void)
             mvprintw(i + opts_start_pos + menu_min_y, menu_min_x + 2, entries[i]);
             attroff(COLOR_PAIR(1)); //returning to default color pair
 
+            //side decorations
             mvprintw(i + opts_start_pos + menu_min_y, menu_min_x,
                     "*");
             mvprintw(i + opts_start_pos + menu_min_y, menu_min_x + menu_w - 1,
                     "*");
         }
+        //print arrow left to selected option
         mvprintw(sel + opts_start_pos + menu_min_y, menu_min_x,
                 ">");
 
         mvprintw(opt_count + opts_start_pos + menu_min_y, menu_min_x,
                 menu_footer);
+
+        //display version number on the bottom
+        print_mid(getmaxy(stdscr) - 1, VERSION);
 
         halfdelay(10); //wait a sec (10/10 of a second) for input
         cmd = getch();
@@ -225,6 +249,10 @@ int main_menu(void)
         }
     }
 
+    for(unsigned i = 0; i < max_strc && i < strc; ++i) {
+        free(strv[i]);
+    }
+
     return 0;
 }
 
@@ -237,24 +265,37 @@ int zeroize_str(char *_str, unsigned _len)
     return 0;
 }
 
-//TODO work in progress
-int get_strings(int *strc_, char **strv_, const char *_fname)
+int read_cfg_file(int *strc_, char **strv_, const char *_fname)
 {
-    char buf[1024];
+    char buf[MAX_CFG_LN_LEN];
     zeroize_str(buf, sizeof(buf));
     FILE *file;
 
-    file = fopen("main.cfg", "r");
+    file = fopen("config.cfg", "r");
+    if(!file) {
+        clear();
+        mvprintw(0, 0, "error opening main.cfg (%s)", strerror(errno));
+        getch();
+        return -1;
+    }
 
-    *strc_ = 0;
+    int strc = 0;
     while(1) {
         fgets(buf, sizeof(buf) - 1, file);
         if(feof(file)) { break; }
 
-        //TODO allocate memory, deallocate when no longer needed
-        strcpy(strv_[*strc_], buf);
-        ++(*strc_);
+        //null the new-line char if existant
+        if(buf[strlen(buf) - 1] == '\n') {
+            buf[strlen(buf) - 1] = '\0';
+        }
+
+        strv_[strc] = malloc(strlen(buf) + 1);
+        strcpy(strv_[strc], buf);
+        ++strc;
     }
+    fclose(file);
+
+    *strc_ = strc;
 
     return 0;
 }
