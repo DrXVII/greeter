@@ -4,12 +4,14 @@
 #include <string.h> //strlen(), strerror()
 #include <time.h> //time(), localtime()
 #include <errno.h>
+#include <assert.h>
 
 //linux
 #include <ncurses.h>
 
 #define MAX_CMD_LEN 1024
 #define MAX_CFG_LN_LEN 1024
+#define MAX_MEN_LNS 20
 #define VERSION "v1.0.2"
 
 int init_nc(void); //initialise ncurses
@@ -21,6 +23,42 @@ int zeroize_str(char *_str, unsigned _len); //fill a char array with null bytes
 int get_strings(int *strc_, char **strv_, const char *_fname); //gets strings from config file
 int read_cfg_file(int *strc_, char **strv_, const char *_fname);
 int main_menu(void);
+
+//TODO PRI_2 implement dynamic loading allocation of menu options, instead of the quick and dirty solution that "just works" and is hardcoded
+
+//cfg_entry and associated functions should be moved to appropriate header TODO-
+//TODO PRI_1 make a function to free memory allocated to cfg_entry members
+struct cfg_entry {
+    char *menu_txt; //menu tex for the entry
+    char *f_to_call; //TODO this should probably be a pointer to a callback
+    char *path; //path to target file
+};
+
+int print_cfg_entry(struct cfg_entry *_cfg) { //for debugging
+    printf("menu_txt = %s\n", _cfg->menu_txt);
+    printf("f_to_call = %s\n", _cfg->f_to_call);
+    printf("path = %s\n", _cfg->path);
+}
+
+int str_to_cfg(char *_str, const char *_delim, struct cfg_entry *cfg_)
+{
+    assert(_str != NULL);
+    assert(_delim != NULL);
+    assert(cfg_ != NULL);
+
+    cfg_->menu_txt = strsep(&_str, _delim);
+    cfg_->f_to_call = strsep(&_str, _delim);
+    cfg_->path = strsep(&_str, _delim);
+
+    if(cfg_->menu_txt == NULL
+    || cfg_->f_to_call == NULL
+    || cfg_->path == NULL) {
+        mvprintw(0, 0, "error while parsing config!!");
+        getch();
+        return -1;
+    }
+}
+//------------------------------------------------------------------------------
 
 int main(void)
 {
@@ -154,14 +192,8 @@ int main_menu(void)
 
     const char cfg_fname[] = "config.cfg";
 
-    char def_daily_fpath[] = "/home/egidijus/Dropbox/suitcase/become_better/get_better.txt";
-    char def_todo_fpath[] = "/home/egidijus/Dropbox/suitcase/todo";
     char daily_fpath[256];
     char todo_fpath[256];
-    //assigning defaults
-    strcpy(daily_fpath, def_daily_fpath);
-    strcpy(todo_fpath, def_todo_fpath);
-    //TODO menu entry text and the way to open the file shoudl be configured in the cfg as well
 
     enum Opts {daily = 0, todo, quit};
     int default_sel = daily;
@@ -174,24 +206,31 @@ int main_menu(void)
     const char menu_footer[] = "*******************************";
     const int menu_w = strlen(menu_header);
 
-    entries[daily] = "view daily tips";
-    entries[todo] = "edit todo list";
-    entries[quit] = "quit to terminal";
-
-    //TODO testing only - remove when done
     int strc = 0;
     int *p_strc = &strc;
     unsigned max_strc = 20;
     char *strv[max_strc];
     read_cfg_file(p_strc, strv, cfg_fname);
+    //TODO if no config found, read defaults.cfg
 
-    //if no config found, read defaults.cfg
+    char *cfg_delim = ";";
+    struct cfg_entry *cfg[2];
+    cfg[0] = malloc(sizeof cfg[0]);
+    cfg[1] = malloc(sizeof cfg[1]);
     if(strc > 0) {
-        strcpy(daily_fpath, strv[0]);
+        if(str_to_cfg(strv[0], cfg_delim, cfg[0]) < 0) {
+            return -1;
+        }
     }
     if(strc > 1) {
-        strcpy(todo_fpath, strv[1]);
+        if(str_to_cfg(strv[1], cfg_delim, cfg[1]) < 0) {
+            return -1;
+        }
     }
+
+    entries[daily] = cfg[0]->menu_txt;
+    entries[todo] = cfg[1]->menu_txt;
+    entries[quit] = "quit to terminal";
 
     char date_str[64];
     const int menu_min_y = 0;
@@ -242,8 +281,8 @@ int main_menu(void)
         if(cmd != 'l') { continue; }
 
         switch(sel) {
-            case daily: slow_print_file(daily_fpath); break;
-            case todo: edit_file(todo_fpath); break;
+            case daily: slow_print_file(cfg[0]->path); break;
+            case todo: edit_file(cfg[1]->path); break;
             case quit: cmd = 'q'; break;
             default: sel == default_sel; break;
         }

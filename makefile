@@ -1,9 +1,10 @@
 CC = gcc
 LIBS = -lncurses
 NAME = greeter.x86_64
+DBG = -ggdb
 
 all:
-	$(CC) -o $(NAME) main.c $(LIBS)
+	$(CC) $(DBG) -o $(NAME) main.c $(LIBS)
 
 dbg:
-	$(CC) -ggdb -o $(NAME) main.c $(LIBS)
+	$(CC) -o $(NAME) main.c $(LIBS)
