@@ -12,7 +12,7 @@
 #define MAX_CMD_LEN 1024
 #define MAX_CFG_LN_LEN 1024
 #define MAX_MEN_LNS 20
-#define VERSION "v1.0.2"
+#define VERSION "v1.1.1"
 
 int init_nc(void); //initialise ncurses
 int view_file(const char *_fpath); //function for viewing files
