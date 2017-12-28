@@ -15,6 +15,8 @@
 #define MAX_CMD_LEN 1024
 #define MAX_CFG_LN_LEN 1024
 #define MAX_MEN_LNS 20
+#define SLOWPRINT_DELAY 1
+#define INPUT_DELAY 10
 #define VERSION "v1.1.1"
 
 int init_nc(void); //initialise ncurses
@@ -102,13 +104,14 @@ int slow_print_file(const char *_fpath)
     int err = errno;
 
     move(0,0);
+
     if(file) {
         int ch = 0;
         int cmd = 0;
 
         clear();
 
-        halfdelay(1); //getch() will wait a bit and then continue
+        halfdelay(SLOWPRINT_DELAY); //getch() will wait a bit and then continue
         //quickly printing some characters that usually appear in bulk
         while((ch = getc(file)) != EOF) {
             addch(ch);
@@ -238,7 +241,7 @@ int main_menu(void)
         //display version number on the bottom
         print_mid(getmaxy(stdscr) - 1, VERSION);
 
-        halfdelay(10); //wait a sec (10/10 of a second) for input
+        halfdelay(INPUT_DELAY); //wait a bit for input
         cmd = getch();
         cbreak(); //turn of input wait limit
 
