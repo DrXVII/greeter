@@ -10,7 +10,9 @@ SRC_DIR = src
 OBJ = o/main.o \
       o/config.o
 
-all: $(O_DIR) $(OBJ)
+all: $(NAME)
+
+$(NAME): $(O_DIR) $(OBJ)
 	$(LL) -o $(NAME) $(OBJ) $(LIBS)
 
 o:

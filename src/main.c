@@ -15,7 +15,7 @@
 #define MAX_CMD_LEN 1024
 #define MAX_CFG_LN_LEN 1024
 #define MAX_MEN_LNS 20
-#define VERSION "v1.1.1"
+#define VERSION "v1.2.0"
 
 int init_nc(void); //initialise ncurses
 int view_file(const char *_fpath); //function for viewing files
@@ -26,8 +26,7 @@ int zeroize_str(char *_str, unsigned _len); //fill a char array with null bytes
 int get_strings(int *strc_, char **strv_, const char *_fname); //gets strings from config file
 int read_cfg_file(int *strc_, char **strv_, const char *_fname);
 int main_menu(void);
-
-//TODO PRI_2 implement dynamic loading allocation of menu options, instead of the quick and dirty solution that "just works" and is hardcoded
+int perf_opt(struct cfg_entry *_f_to_call);
 
 int main(void)
 {
@@ -48,12 +47,12 @@ int init_nc(void)
     curs_set(0); //make the cursor invisible
 
     if(!has_colors()) {
-        mvprintw(0, 0, "This terminal does not support color!\n");
+        mvprintw(0, 0, "This terminal does not support colour!\n");
         getch();
     }
     else { start_color(); }
 
-    //initialising color pairs
+    //initialising colour pairs
     init_pair(1, COLOR_BLACK, COLOR_WHITE);
 
     return 0;
@@ -164,42 +163,32 @@ int main_menu(void)
     char daily_fpath[256];
     char todo_fpath[256];
 
-    enum Opts {daily = 0, todo, quit};
-    int default_sel = daily;
-    int last_sel = quit;
-
-    int opt_count = last_sel + 1;
-    char *entries[opt_count]; 
+    int default_sel = 0;
 
     const char menu_header[] = "********** MAIN MENU **********";
     const char menu_footer[] = "*******************************";
     const int menu_w = strlen(menu_header);
 
-    int strc = 0;
-    int *p_strc = &strc;
+    int opt_count = 0;
+    //TODO remove the max_strc limitation, and make the menu scrollable
     unsigned max_strc = 20;
     char *strv[max_strc];
-    read_cfg_file(p_strc, strv, cfg_fname);
+    read_cfg_file(&opt_count, strv, cfg_fname);
     //TODO if no config found, read defaults.cfg
 
-    char *cfg_delim = ";";
-    struct cfg_entry *cfg[2];
-    cfg[0] = malloc(sizeof cfg[0]);
-    cfg[1] = malloc(sizeof cfg[1]);
-    if(strc > 0) {
-        if(str_to_cfg(strv[0], cfg_delim, cfg[0]) < 0) {
-            return -1;
-        }
-    }
-    if(strc > 1) {
-        if(str_to_cfg(strv[1], cfg_delim, cfg[1]) < 0) {
-            return -1;
-        }
-    }
+    char **entries = calloc(opt_count, sizeof entries[0]);
+    int last_sel = opt_count - 1;
 
-    entries[daily] = cfg[0]->menu_txt;
-    entries[todo] = cfg[1]->menu_txt;
-    entries[quit] = "quit to terminal";
+    char *cfg_delim = ";";
+    struct cfg_entry **cfg = calloc(opt_count, sizeof cfg[0]);
+    for(unsigned i = 0; i < opt_count; ++i) {
+        //allocating memory
+        cfg[i] = malloc(sizeof cfg[i]);
+        if(str_to_cfg(strv[i], cfg_delim, cfg[i]) < 0) { return -1; }
+        entries[i] = malloc(strlen(cfg[i]->menu_txt) + 1); //+1 for null-term
+
+        strcpy(entries[i], cfg[i]->menu_txt);
+    }
 
     char date_str[64];
     const int menu_min_y = 0;
@@ -246,20 +235,21 @@ int main_menu(void)
 
         if(cmd == 'k' && sel > 0) { --sel; }
         else if(cmd == 'j' && sel < opt_count - 1) { ++sel; }
-
-        if(cmd != 'l') { continue; }
-
-        switch(sel) {
-            case daily: slow_print_file(cfg[0]->path); break;
-            case todo: edit_file(cfg[1]->path); break;
-            case quit: cmd = 'q'; break;
-            default: sel == default_sel; break;
+        else if(cmd == 'l') {
+            int rc = perf_opt(cfg[sel]);
+            if(rc == 1) { break; }
+            continue;
         }
     }
 
-    for(unsigned i = 0; i < max_strc && i < strc; ++i) {
+    for(unsigned i = 0; i < max_strc && i < opt_count; ++i) {
         free(strv[i]);
+        free(entries[i]);
+        free(cfg[i]);
+        //free_cfg_entry() TODO not implemented yet
     }
+    free(entries);
+    free(cfg);
 
     return 0;
 }
@@ -304,6 +294,16 @@ int read_cfg_file(int *strc_, char **strv_, const char *_fname)
     fclose(file);
 
     *strc_ = strc;
+
+    return 0;
+}
+
+int perf_opt(struct cfg_entry *_opt)
+{
+    if(strcmp(_opt->f_to_call, "slow_print") == 0) {
+        slow_print_file(_opt->path); }
+    else if(strcmp(_opt->f_to_call, "edit") == 0) { edit_file(_opt->path); }
+    else if(strcmp(_opt->f_to_call, "quit") == 0) { return 1; }
 
     return 0;
 }
