@@ -15,7 +15,7 @@
 #define MAX_CMD_LEN 1024
 #define MAX_CFG_LN_LEN 1024
 #define MAX_MEN_LNS 20
-#define VERSION "v1.2.0"
+#define VERSION "v1.2.1"
 
 int init_nc(void); //initialise ncurses
 int view_file(const char *_fpath); //function for viewing files
@@ -26,7 +26,7 @@ int zeroize_str(char *_str, unsigned _len); //fill a char array with null bytes
 int get_strings(int *strc_, char **strv_, const char *_fname); //gets strings from config file
 int read_cfg_file(int *strc_, char **strv_, const char *_fname);
 int main_menu(void);
-int perf_opt(struct cfg_entry *_f_to_call);
+int perf_opt(struct cfg_entry *_f_to_call);//perform cfg_entry assigned function
 
 int main(void)
 {
@@ -174,9 +174,9 @@ int main_menu(void)
     unsigned max_strc = 20;
     char *strv[max_strc];
     read_cfg_file(&opt_count, strv, cfg_fname);
-    //TODO if no config found, read defaults.cfg
+    //TODO if no config found, read defaults.cfg (implement)
 
-    char **entries = calloc(opt_count, sizeof entries[0]);
+    char **menu_lines = calloc(opt_count, sizeof menu_lines[0]);
     int last_sel = opt_count - 1;
 
     char *cfg_delim = ";";
@@ -185,9 +185,9 @@ int main_menu(void)
         //allocating memory
         cfg[i] = malloc(sizeof cfg[i]);
         if(str_to_cfg(strv[i], cfg_delim, cfg[i]) < 0) { return -1; }
-        entries[i] = malloc(strlen(cfg[i]->menu_txt) + 1); //+1 for null-term
+        menu_lines[i] = malloc(strlen(cfg[i]->menu_txt) + 1); //+1 for null-term
 
-        strcpy(entries[i], cfg[i]->menu_txt);
+        strcpy(menu_lines[i], cfg[i]->menu_txt);
     }
 
     char date_str[64];
@@ -208,7 +208,7 @@ int main_menu(void)
             if(i == sel) { //paint selected menu option differently
                 attron(COLOR_PAIR(1));
             }
-            mvprintw(i + opts_start_pos + menu_min_y, menu_min_x + 2, entries[i]);
+            mvprintw(i + opts_start_pos + menu_min_y, menu_min_x + 2, menu_lines[i]);
             attroff(COLOR_PAIR(1)); //returning to default color pair
 
             //side decorations
@@ -244,11 +244,10 @@ int main_menu(void)
 
     for(unsigned i = 0; i < max_strc && i < opt_count; ++i) {
         free(strv[i]);
-        free(entries[i]);
-        free(cfg[i]);
-        //free_cfg_entry() TODO not implemented yet
+        free(menu_lines[i]);
+        free_cfg_entry(cfg[i]);
     }
-    free(entries);
+    free(menu_lines);
     free(cfg);
 
     return 0;

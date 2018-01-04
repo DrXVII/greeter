@@ -1,0 +1,12 @@
+= TODO LIST
+
+== v1.3.x
+
+=== Bugs
+
+=== New Functionality
+* [ ] Make the menu scrollable (in order to remove the menu entries cap)
+* [ ] Implement custom system call as opposed to the implemented functions
+
+=== Refining
+* [ ] Consider storing the cfg_entry call function as a pointer to the function as opposed to text

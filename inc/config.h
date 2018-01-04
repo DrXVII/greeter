@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 //linux
 #include <ncurses.h>
@@ -18,6 +19,7 @@ struct cfg_entry {
 
 //load config entry from string
 int str_to_cfg(char *_str, const char *_delim, struct cfg_entry *cfg_);
+void free_cfg_entry(struct cfg_entry *_entry);
 int print_cfg_entry(struct cfg_entry *_cfg); //for debugging
 
 #endif //ifndef CONFIG_H
