@@ -1,8 +1,11 @@
 = TODO LIST
 
 == v1.3.x
+=== Refine
+* [ ] move .cfg and supporting files to a separate directory (e.g. cfg/) and simplify the makefile accordingly
 
 === Bugs
+* [ ] nothing yet
 
 === New Functionality
 * [ ] Make the menu scrollable (in order to remove the menu entries cap)
