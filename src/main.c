@@ -15,9 +15,10 @@
 #define MAX_CMD_LEN 1024
 #define MAX_CFG_LN_LEN 1024
 #define MAX_MEN_LNS 20
-#define VERSION "v1.2.1"
+#define VERSION "v1.2.2"
 
 int init_nc(void); //initialise ncurses
+int parse_args(int _argc, char **_argv, char **_cfg_fname); //parse arguments passed to program
 int view_file(const char *_fpath); //function for viewing files
 int edit_file(const char *_fpath); //function for editing files
 int slow_print_file(const char *_fpath); //prints file slowly char by char
@@ -25,14 +26,17 @@ int print_mid(int _y, const char* _s); //print in middle of screen (on x axis)
 int zeroize_str(char *_str, unsigned _len); //fill a char array with null bytes
 int get_strings(int *strc_, char **strv_, const char *_fname); //gets strings from config file
 int read_cfg_file(int *strc_, char **strv_, const char *_fname);
-int main_menu(void);
+int main_menu(char *_cfg_fname);
 int perf_opt(struct cfg_entry *_f_to_call);//perform cfg_entry assigned function
 
-int main(void)
+int main(int argc, char **argv)
 {
     init_nc();
 
-    main_menu();
+    char *cfg_fname = NULL;
+    parse_args(argc, argv, &cfg_fname);
+
+    main_menu(cfg_fname);
 
     endwin(); //end ncurses mode
     return 0;
@@ -54,6 +58,20 @@ int init_nc(void)
 
     //initialising colour pairs
     init_pair(1, COLOR_BLACK, COLOR_WHITE);
+
+    return 0;
+}
+
+int parse_args(int _argc, char **_argv, char **_cfg_fname)
+{
+    if(_argc > 1 && (strcmp(_argv[1], "-c") == 0)) {
+        if(_argc < 3) {
+            mvprintw(0,0, "config flag needs file-name parameter!");
+            getch();
+            return 1;
+        }
+        else { *_cfg_fname = _argv[2]; }
+    }
 
     return 0;
 }
@@ -154,11 +172,9 @@ int print_mid(int _y, const char* _s)
     return our_x;
 }
 
-int main_menu(void)
+int main_menu(char *_cfg_fname)
 {
     int cmd = 0;
-
-    const char cfg_fname[] = "config.cfg";
 
     char daily_fpath[256];
     char todo_fpath[256];
@@ -173,7 +189,7 @@ int main_menu(void)
     //TODO remove the max_strc limitation, and make the menu scrollable
     unsigned max_strc = 20;
     char *strv[max_strc];
-    read_cfg_file(&opt_count, strv, cfg_fname);
+    read_cfg_file(&opt_count, strv, _cfg_fname);
     //TODO if no config found, read defaults.cfg (implement)
 
     char **menu_lines = calloc(opt_count, sizeof menu_lines[0]);
@@ -264,11 +280,15 @@ int zeroize_str(char *_str, unsigned _len)
 
 int read_cfg_file(int *strc_, char **strv_, const char *_fname)
 {
+    char dfname[] = "config.cfg"; //default config filename
+    const char *fname = _fname;
+    if(fname == NULL) { fname = dfname; }
+
     char buf[MAX_CFG_LN_LEN];
     zeroize_str(buf, sizeof(buf));
     FILE *file;
 
-    file = fopen("config.cfg", "r");
+    file = fopen(fname, "r");
     if(!file) {
         clear();
         mvprintw(0, 0, "error opening main.cfg (%s)", strerror(errno));
