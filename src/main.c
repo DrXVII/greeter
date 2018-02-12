@@ -50,15 +50,6 @@ int init_nc(void)
     keypad(stdscr, true); //enable function keys (like F1, F2, pg_up, etc...)
     curs_set(0); //make the cursor invisible
 
-    if(!has_colors()) {
-        mvprintw(0, 0, "This terminal does not support colour!\n");
-        getch();
-    }
-    else { start_color(); }
-
-    //initialising colour pairs
-    init_pair(1, COLOR_BLACK, COLOR_WHITE);
-
     return 0;
 }
 
@@ -118,6 +109,8 @@ int slow_print_file(const char *_fpath)
     file = fopen(_fpath, "r");
     int err = errno;
 
+    unsigned ff_i = 0; //iterator for fast forwarding
+
     move(0,0);
     if(file) {
         int ch = 0;
@@ -129,6 +122,9 @@ int slow_print_file(const char *_fpath)
         //quickly printing some characters that usually appear in bulk
         while((ch = getc(file)) != EOF) {
             addch(ch);
+
+            if(ff_i > 0) { --ff_i; continue; }
+
             if(ch == '*'
             || ch == ' '
             || ch == '+'
@@ -139,8 +135,11 @@ int slow_print_file(const char *_fpath)
                 continue;
             }
 
+
             cmd = getch();
-            if(cmd != ERR) { break; }
+            if(cmd == 'j') { ff_i = 100; } //fast forward 100ch
+            else if (cmd == 'g') { ff_i = 1000; } //ff 1000ch
+            else if(cmd != ERR) { break; }
         }
         cbreak(); //getch() will wait for input indefinitely (interruptable)
     }
@@ -222,10 +221,10 @@ int main_menu(char *_cfg_fname)
         //print menu options
         for(unsigned i = 0; i < opt_count; ++i) {
             if(i == sel) { //paint selected menu option differently
-                attron(COLOR_PAIR(1));
+                attron(A_REVERSE);
             }
             mvprintw(i + opts_start_pos + menu_min_y, menu_min_x + 2, menu_lines[i]);
-            attroff(COLOR_PAIR(1)); //returning to default color pair
+            attroff(A_REVERSE);
 
             //side decorations
             mvprintw(i + opts_start_pos + menu_min_y, menu_min_x,
